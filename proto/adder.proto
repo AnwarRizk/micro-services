@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package adder;
+
+service AdderService {
+  rpc Add (AddRequest) returns (AddResponse);
+}
+
+message AddRequest {
+  double a = 1;
+  double b = 2;
+}
+
+message AddResponse {
+  double sum = 1;
+  string event_id = 2;
+}

@@ -1,0 +1,20 @@
+# --- Node.js (service-a) ---
+node_modules/
+npm-debug.log*
+
+# --- Python (service-b) ---
+venv/
+__pycache__/
+*.pyc
+
+# --- Local runtime state (not part of the source, regenerated at runtime) ---
+service-b/sum_state.json
+service-b/sum_state.json.tmp
+
+# --- Editor / OS noise ---
+.vscode/
+.idea/
+.DS_Store
+
+# --- Secrets, if you add any later ---
+.env
