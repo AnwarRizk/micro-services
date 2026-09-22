@@ -1,8 +1,7 @@
 const path = require('path');
-const crypto = require('crypto');
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
-const { Kafka } = require('kafkajs');
+const pg = require('pg');
 
 const PROTO_PATH = path.join(__dirname, '..', 'proto', 'adder.proto');
 
@@ -16,17 +15,13 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 
 const adderProto = grpc.loadPackageDefinition(packageDefinition).adder;
 
-// --- Kafka producer setup ---
-// KAFKA_BROKER defaults to Kafka's "EXTERNAL" listener (localhost:9094)
-// because we're running this process directly on the host, not inside Docker.
-const KAFKA_BROKER = process.env.KAFKA_BROKER || 'localhost:9094';
-const KAFKA_TOPIC = process.env.KAFKA_TOPIC || 'number-added';
-
-const kafka = new Kafka({
-  clientId: 'service-a',
-  brokers: [KAFKA_BROKER],
+const pool = new pg.Pool({
+  user: process.env.POSTGRES_USER || 'anwar',
+  host: process.env.POSTGRES_HOST || 'localhost',
+  database: process.env.POSTGRES_DB || 'sumdb',
+  password: process.env.POSTGRES_PASSWORD || '1234',
+  port: parseInt(process.env.POSTGRES_PORT, 10) || 5433,
 });
-const producer = kafka.producer();
 
 // --- RPC handler ---
 // Adds the two numbers, then publishes the result to Kafka.
@@ -48,30 +43,24 @@ async function add(call, callback) {
   }
 
   const sum = a + b;
-  const eventId = crypto.randomUUID();
-
   console.log(`[Add] ${a} + ${b} = ${sum}`);
 
+  let eventId;
   try {
-    await producer.send({
-      topic: KAFKA_TOPIC,
-      messages: [
-        {
-          key: eventId,
-          value: JSON.stringify({
-            event_id: eventId,
-            value: sum,
-            produced_at: new Date().toISOString(),
-          }),
-        },
+    const result = await pool.query(
+      `INSERT INTO outbox (event_type, payload) VALUES ($1, $2) RETURNING id`,
+      [
+        'NumberAdded',
+        JSON.stringify({ value: sum, produced_at: new Date().toISOString() }),
       ],
-    });
-    console.log(`[Kafka] published event ${eventId} to ${KAFKA_TOPIC}`);
+    );
+    eventId = result.rows[0].id;
+    console.log(`[Outbox] wrote event ${eventId}`);
   } catch (err) {
-    console.error(`[Kafka] failed to publish:`, err.message);
+    console.error(`[Outbox] failed to write:`, err.message);
     return callback({
       code: grpc.status.UNAVAILABLE,
-      message: `Computed sum but failed to publish to Kafka: ${err.message}`,
+      message: `Computed sum but failed to write outbox event: ${err.message}`,
     });
   }
 
@@ -79,9 +68,6 @@ async function add(call, callback) {
 }
 
 async function main() {
-  await producer.connect();
-  console.log(`[Kafka] producer connected to ${KAFKA_BROKER}`);
-
   const server = new grpc.Server();
   server.addService(adderProto.AdderService.service, { add });
 
@@ -92,12 +78,5 @@ async function main() {
     console.log(`Service A (gRPC) listening on ${bindAddr}`);
   });
 }
-
-// Graceful shutdown: disconnect the producer cleanly rather than just dying
-process.on('SIGINT', async () => {
-  console.log('\nShutting down, disconnecting Kafka producer...');
-  await producer.disconnect();
-  process.exit(0);
-});
 
 main();

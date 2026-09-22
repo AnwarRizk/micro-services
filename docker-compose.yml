@@ -1,4 +1,21 @@
 services:
+  # ---------- Data store ----------
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: anwar
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: sumdb
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U anwar -d sumdb']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # ---------- Kafka broker (KRaft mode: no separate Zookeeper needed) ----------
   kafka:
     image: apache/kafka:latest
@@ -38,6 +55,9 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     ports:
       - '8080:8080'
+
+volumes:
+  pgdata:
 
 # NOTE: service-a and service-b are not containerized yet — run them
 # directly on your host (npm start / uvicorn) for now. They'll be added
