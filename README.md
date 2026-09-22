@@ -79,18 +79,9 @@ Kafka UI will be available at http://localhost:8080. Kafka itself listens
 on `localhost:9094` for processes running directly on your host. PostgreSQL
 is available at `localhost:5433`.
 
-Create the outbox table once after PostgreSQL starts:
-
-```bash
-docker compose exec postgres psql -U anwar -d sumdb -c \
-  "CREATE TABLE IF NOT EXISTS outbox (
-     id BIGSERIAL PRIMARY KEY,
-     event_type TEXT NOT NULL,
-     payload JSONB NOT NULL,
-     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-     published_at TIMESTAMPTZ
-   );"
-```
+Service A creates the `outbox` table automatically during startup if it does
+not already exist. The table uses a UUID primary key and stores the event
+payload as JSONB.
 
 ### 2. Start Service A
 
@@ -100,7 +91,9 @@ npm install
 npm start
 ```
 
-You should see `Service A (gRPC) listening on 0.0.0.0:50051`.
+Service A initializes the outbox table before binding gRPC. You should see
+`[Outbox] table ready` followed by
+`Service A (gRPC) listening on 0.0.0.0:50051`.
 
 ### 3. Start the outbox relay
 
@@ -180,9 +173,9 @@ can count retained events twice.
 
 ## Known gotchas
 
-- **Create the outbox table first.** `docker-compose.yml` starts PostgreSQL
-  but does not run migrations. Service A will return `UNAVAILABLE` until the
-  table from the setup step exists.
+- **PostgreSQL must be available before Service A starts.** Service A creates
+  the outbox table during startup and will not bind its gRPC port if that
+  initialization fails.
 - **The relay is required.** Service A no longer publishes directly to Kafka.
   Start the relay after PostgreSQL and Kafka are available, or events will
   remain in the outbox with `published_at` set to `NULL`.
