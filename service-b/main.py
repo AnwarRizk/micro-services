@@ -33,7 +33,9 @@ def save_state_to_disk():
     tmp_path = SUM_FILE_PATH + ".tmp"
     with open(tmp_path, "w") as f:
         # Use json.dump instead of json.dumps to write directly to the file
+        # We write the state to the temp file first, then rename it to the final path.
         json.dump(state, f)
+    # Rename the temp file to the final path, replacing any existing file.
     os.replace(tmp_path, SUM_FILE_PATH)
 
 
