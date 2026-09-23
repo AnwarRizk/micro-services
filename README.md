@@ -5,6 +5,19 @@ requests over gRPC, stores an event in a PostgreSQL outbox, and a separate
 relay publishes pending events to Kafka. Service B consumes those events and
 exposes the running total over REST.
 
+## Recent updates
+
+- Migrated the flow to a durable PostgreSQL outbox pattern: Service A now
+  writes `NumberAdded` events to `outbox` and returns the generated event ID.
+- Added a dedicated Node.js relay that polls unpublished outbox rows, sends
+  them to Kafka, and marks them as published.
+- Switched the Kafka setup to a single-node KRaft configuration with a host
+  listener on `localhost:9094`, plus Kafka UI for inspection.
+- Service B now runs as a background `aiokafka` consumer, keeps a running
+  total in memory, and persists it to `sum_state.json` after each event.
+- Local development currently runs Postgres, Kafka, and Kafka UI through
+  Docker Compose while Service A and Service B run directly on the host.
+
 ## Current architecture
 
 ```
@@ -44,7 +57,9 @@ Actor/User <--REST-------------------------------- Service B (Python/FastAPI)
 
 ```
 .
-├── docker-compose.yml       # PostgreSQL, Kafka, and Kafka UI
+├── docker-compose.yml       # Runs PostgreSQL, Kafka, and Kafka UI
+├── db/
+│   └── init.sql             # Creates the outbox table on first Postgres startup
 ├── proto/
 │   └── adder.proto          # gRPC contract for Service A
 ├── service-a/                # Node.js gRPC server + outbox writer
@@ -54,11 +69,13 @@ Actor/User <--REST-------------------------------- Service B (Python/FastAPI)
 ├── outbox-relay/             # Node.js PostgreSQL-to-Kafka relay
 │   ├── relay.js
 │   └── package.json
-└── service-b/                 # Python FastAPI + Kafka consumer
-    ├── main.py
-    ├── requirements.txt
-    ├── generated/             # protoc-generated stubs (not currently used by main.py)
-    └── sum_state.json         # local persisted aggregate state
+├── service-b/                 # Python FastAPI + Kafka consumer
+│   ├── main.py
+│   ├── requirements.txt
+│   ├── generated/            # protoc-generated stubs
+│   └── sum_state.json        # local persisted aggregate state
+├── README.md
+└── .gitignore
 ```
 
 ## Prerequisites
@@ -79,9 +96,9 @@ Kafka UI will be available at http://localhost:8080. Kafka itself listens
 on `localhost:9094` for processes running directly on your host. PostgreSQL
 is available at `localhost:5433`.
 
-Service A creates the `outbox` table automatically during startup if it does
-not already exist. The table uses a UUID primary key and stores the event
-payload as JSONB.
+The database is initialized from [db/init.sql](db/init.sql), which creates the
+`outbox` table on the first Postgres startup. The table uses a UUID primary key
+and stores the event payload as JSONB.
 
 ### 2. Start Service A
 
@@ -91,9 +108,9 @@ npm install
 npm start
 ```
 
-Service A initializes the outbox table before binding gRPC. You should see
-`[Outbox] table ready` followed by
-`Service A (gRPC) listening on 0.0.0.0:50051`.
+The database is expected to be ready before Service A starts, because the
+Compose bootstrap script creates the `outbox` table in PostgreSQL. Once the
+service is running you should see `Service A (gRPC) listening on 0.0.0.0:50051`.
 
 ### 3. Start the outbox relay
 
@@ -173,9 +190,10 @@ can count retained events twice.
 
 ## Known gotchas
 
-- **PostgreSQL must be available before Service A starts.** Service A creates
-  the outbox table during startup and will not bind its gRPC port if that
-  initialization fails.
+- **PostgreSQL must be available before Service A starts.** The Compose
+  bootstrap script in [db/init.sql](db/init.sql) creates the outbox table on
+  first startup. If the database is not ready, Service A will fail when it
+  tries to insert its first event.
 - **The relay is required.** Service A no longer publishes directly to Kafka.
   Start the relay after PostgreSQL and Kafka are available, or events will
   remain in the outbox with `published_at` set to `NULL`.
