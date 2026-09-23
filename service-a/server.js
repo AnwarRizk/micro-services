@@ -23,20 +23,6 @@ const pool = new pg.Pool({
   port: parseInt(process.env.POSTGRES_PORT, 10) || 5433,
 });
 
-// Ensure the outbox table exists before starting the gRPC server
-async function ensureOutboxTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS outbox (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      event_type TEXT NOT NULL,
-      payload JSONB NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      published_at TIMESTAMPTZ
-    );
-  `);
-  console.log('[Outbox] table ready');
-}
-
 // --- RPC handler ---
 // Adds the two numbers, then publishes the result to Kafka.
 // We await the Kafka publish before calling back so a publish failure
@@ -82,7 +68,6 @@ async function add(call, callback) {
 }
 
 async function main() {
-  await ensureOutboxTable();
   const server = new grpc.Server();
   server.addService(adderProto.AdderService.service, { add });
 

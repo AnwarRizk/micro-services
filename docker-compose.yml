@@ -10,6 +10,8 @@ services:
       - '5433:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Mount a SQL script to initialize the database with the outbox table
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U anwar -d sumdb']
       interval: 5s
