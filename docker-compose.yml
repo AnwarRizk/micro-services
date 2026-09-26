@@ -61,6 +61,8 @@ services:
   # ---------- Monitoring ----------
   prometheus:
     image: prom/prometheus:latest
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:

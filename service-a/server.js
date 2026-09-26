@@ -2,6 +2,13 @@ const path = require('path');
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const pg = require('pg');
+const client = require('@prometheus-io/client');
+const http = require('http');
+
+const addCounter = new client.Counter({
+  name: 'add_requests_total',
+  help: 'Total number of Add calls',
+});
 
 const PROTO_PATH = path.join(__dirname, '..', 'proto', 'adder.proto');
 
@@ -24,9 +31,9 @@ const pool = new pg.Pool({
 });
 
 // --- RPC handler ---
-// Adds the two numbers, then publishes the result to Kafka.
-// We await the Kafka publish before calling back so a publish failure
-// is visible to the caller as an error, rather than silently dropped.
+// Adds the two numbers, then writes the result to the outbox table.
+// We await the write before calling back so a DB failure is visible
+// to the caller as an error, rather than silently dropped.
 async function add(call, callback) {
   const { a, b } = call.request;
 
@@ -56,6 +63,7 @@ async function add(call, callback) {
     );
     eventId = result.rows[0].id;
     console.log(`[Outbox] wrote event ${eventId}`);
+    addCounter.inc(); // Increment the Prometheus counter for successful add calls
   } catch (err) {
     console.error(`[Outbox] failed to write:`, err.message);
     return callback({
@@ -77,6 +85,16 @@ async function main() {
   server.bindAsync(bindAddr, grpc.ServerCredentials.createInsecure(), () => {
     console.log(`Service A (gRPC) listening on ${bindAddr}`);
   });
+
+  // Start the Prometheus metrics server
+  http
+    .createServer(async (req, res) => {
+      res.setHeader('Content-Type', client.register.contentType);
+      res.end(await client.register.metrics());
+    })
+    .listen(9100, () => {
+      console.log('Metrics server listening on 0.0.0.0:9100');
+    });
 }
 
 main();
