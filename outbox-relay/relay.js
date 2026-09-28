@@ -35,8 +35,8 @@ const pool = new pg.Pool({
   port: parseInt(process.env.POSTGRES_PORT, 10) || 5433,
 });
 
-const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS, 10) || 2000;
-const BATCH_SIZE = 50;
+const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS, 10) || 1000;
+const BATCH_SIZE = parseInt(process.env.BATCH_SIZE, 10) || 100;
 
 // A simple flag so we don't start a second poll cycle while one is still
 // running (e.g. if a poll cycle takes longer than POLL_INTERVAL_MS due to
@@ -62,42 +62,41 @@ async function pollAndPublish() {
 
     console.log(`[relay] found ${rows.length} unpublished event(s)`);
 
-    for (const row of rows) {
-      try {
-        await producer.send({
-          topic: KAFKA_TOPIC,
-          messages: [
-            {
-              key: row.id,
-              value: JSON.stringify({
-                event_id: row.id,
-                value: row.payload.value,
-                produced_at: row.payload.produced_at,
-              }),
-            },
-          ],
-        });
+    // Build every Kafka message up front, then send them all in ONE
+    // network round trip instead of one round trip per row.
+    const messages = rows.map((row) => ({
+      key: row.id,
+      value: JSON.stringify({
+        event_id: row.id,
+        value: row.payload.value,
+        produced_at: row.payload.produced_at,
+      }),
+    }));
 
-        await pool.query(
-          `UPDATE outbox SET published_at = now() WHERE id = $1`,
-          [row.id],
-        );
+    try {
+      await producer.send({ topic: KAFKA_TOPIC, messages });
 
-        // Record the latency from when the event was created to when it was published.
+      // Same idea for Postgres: one UPDATE covering every row in the
+      // batch, instead of one UPDATE per row.
+      const ids = rows.map((row) => row.id);
+      await pool.query(
+        `UPDATE outbox SET published_at = now() WHERE id = ANY($1)`,
+        [ids],
+      );
+
+      // Record latency per row, now that the whole batch succeeded.
+      for (const row of rows) {
         const latencySeconds =
           (Date.now() - new Date(row.created_at).getTime()) / 1000;
         publishLatency.observe(latencySeconds);
-
-        console.log(`[relay] published and marked event ${row.id}`);
-      } catch (err) {
-        // One bad row shouldn't block the rest of the batch — log it and
-        // move on. Since published_at is still NULL, this row will simply
-        // be retried on the next poll cycle.
-        console.error(
-          `[relay] failed to publish event ${row.id}:`,
-          err.message,
-        );
       }
+
+      console.log(`[relay] published and marked ${rows.length} event(s)`);
+    } catch (err) {
+      // The WHOLE batch failed — none of these rows got marked published,
+      // so they'll all be retried automatically on the next poll cycle.
+      // This is the trade-off: we lost per-row isolation in exchange for speed.
+      console.error(`[relay] batch publish failed:`, err.message);
     }
   } catch (err) {
     // The SELECT itself failed (e.g. Postgres unreachable) — nothing to do
