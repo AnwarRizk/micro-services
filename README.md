@@ -14,7 +14,7 @@ and Grafana show how fast events move through the pipeline.
 ```
 Actor/User --gRPC--> Service A (Node.js) --INSERT--> PostgreSQL (outbox table)
                                                           |
-                                                          | polls every 2s
+                                                          | polls every 1s (batch size: 100)
                                                           v
                                                      Outbox relay (Node.js)
                                                           |
@@ -145,7 +145,7 @@ npm install
 npm start
 ```
 
-The relay polls every 2 seconds by default. Its metrics are on port `9101`.
+The relay polls every 1 second by default. Its metrics are on port `9101`.
 
 ### 4. Start Service B
 
