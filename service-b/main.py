@@ -5,7 +5,14 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from aiokafka import AIOKafkaConsumer
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
+from prometheus_client import Histogram, generate_latest, CONTENT_TYPE_LATEST
+
+consume_latency = Histogram(
+    "consume_latency_seconds",
+    "Latency from event production to consumption",
+    buckets=[0.01, 0.05, 0.1, 0.5, 1, 2, 5],
+)
 
 KAFKA_BROKER = os.environ.get("KAFKA_BROKER", "localhost:9094")
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "number-added")
@@ -51,6 +58,12 @@ async def consume_loop():
     try:
         async for msg in consumer:
             event = json.loads(msg.value)
+            
+            # The produced_at field is in ISO 8601 format, but it ends with a "Z" to indicate UTC time. The datetime.fromisoformat method does not accept the "Z" suffix, so we replace it with "+00:00" to indicate UTC offset.
+            produced_at = datetime.fromisoformat(event["produced_at"].replace("Z", "+00:00"))
+            latency = (datetime.now(timezone.utc) - produced_at).total_seconds()
+            consume_latency.observe(latency)
+
             state["sum"] += event["value"]
             state["updated_at"] = datetime.now(timezone.utc).isoformat()
             state["last_event_id"] = event.get("event_id")
@@ -79,6 +92,10 @@ app = FastAPI(lifespan=lifespan)
 def get_sum():
     """Returns the running total of every sum published by Service A so far."""
     return state
+
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/healthz")

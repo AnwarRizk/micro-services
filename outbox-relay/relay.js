@@ -1,5 +1,15 @@
 const { Kafka } = require('kafkajs');
 const pg = require('pg');
+const client = require('@prometheus-io/client');
+const http = require('http');
+
+// Prometheus metrics
+client.collectDefaultMetrics();
+const publishLatency = new client.Histogram({
+  name: 'outbox_publish_latency_seconds',
+  help: 'Latency of publishing outbox events to Kafka',
+  buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5],
+});
 
 // --- Kafka producer setup ---
 // KAFKA_BROKER defaults to Kafka's "EXTERNAL" listener (localhost:9094)
@@ -39,7 +49,7 @@ async function pollAndPublish() {
 
   try {
     const { rows } = await pool.query(
-      `SELECT id, payload FROM outbox
+      `SELECT id, payload, created_at FROM outbox
        WHERE published_at IS NULL
        ORDER BY created_at ASC
        LIMIT $1`,
@@ -73,6 +83,11 @@ async function pollAndPublish() {
           [row.id],
         );
 
+        // Record the latency from when the event was created to when it was published.
+        const latencySeconds =
+          (Date.now() - new Date(row.created_at).getTime()) / 1000;
+        publishLatency.observe(latencySeconds);
+
         console.log(`[relay] published and marked event ${row.id}`);
       } catch (err) {
         // One bad row shouldn't block the rest of the batch — log it and
@@ -99,6 +114,16 @@ async function main() {
   console.log(`[relay] polling outbox every ${POLL_INTERVAL_MS}ms`);
 
   setInterval(pollAndPublish, POLL_INTERVAL_MS);
+
+  // Start the Prometheus metrics server
+  http
+    .createServer(async (req, res) => {
+      res.setHeader('Content-Type', client.register.contentType);
+      res.end(await client.register.metrics());
+    })
+    .listen(9101, () => {
+      console.log('Metrics server listening on 0.0.0.0:9101');
+    });
 }
 
 process.on('SIGINT', async () => {
