@@ -5,6 +5,7 @@ const pg = require('pg');
 const client = require('@prometheus-io/client');
 const http = require('http');
 
+client.collectDefaultMetrics();
 const addCounter = new client.Counter({
   name: 'add_requests_total',
   help: 'Total number of Add calls',

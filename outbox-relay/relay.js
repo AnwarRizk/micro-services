@@ -4,6 +4,7 @@ const client = require('@prometheus-io/client');
 const http = require('http');
 
 // Prometheus metrics
+client.collectDefaultMetrics();
 const publishLatency = new client.Histogram({
   name: 'outbox_publish_latency_seconds',
   help: 'Latency of publishing outbox events to Kafka',

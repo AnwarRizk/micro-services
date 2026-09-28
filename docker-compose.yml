@@ -74,9 +74,12 @@ services:
       - '3000:3000'
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
 
 volumes:
   pgdata:
+  grafana-data:
 
 # NOTE: service-a and service-b are not containerized yet — run them
 # directly on your host (npm start / uvicorn) for now. They'll be added
