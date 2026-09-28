@@ -90,8 +90,9 @@ Service B     :8000/metrics --+
 │   └── package.json
 ├── service-b/                # Python FastAPI + Kafka consumer
 │   ├── main.py
-│   ├── requirements.txt
-│   └── generated/            # protoc-generated stubs (not used by main.py today)
+│   └── requirements.txt
+├── load-test/
+│   └── grpc-test.js          # K6 load test against Service A's gRPC Add
 ├── README.md
 └── .gitignore
 ```
@@ -283,6 +284,72 @@ counts retained events twice.
   Run `docker compose down --remove-orphans`, then restart Docker if the
   error stays.
 
+## Load testing
+
+`load-test/grpc-test.js` is a [K6](https://k6.io/) script that sends gRPC
+`Add` requests directly to Service A at increasing rates, so you can watch
+the pipeline under real load instead of a few manual calls.
+
+### Install K6
+
+Follow the instructions for your OS at
+https://grafana.com/docs/k6/latest/set-up/install-k6/. K6's gRPC support
+(`k6/net/grpc`) is built in — no extra plugin needed. Confirm it installed:
+
+```bash
+k6 version
+```
+
+### What the script does
+
+- Loads `adder.proto` and connects to Service A on `localhost:50051`.
+- Uses the `ramping-arrival-rate` executor, which sends a fixed number of
+  requests per second, ramping through stages: `10/s` for 30s, `25/s` for
+  1m, `50/s` for 1m, then down to `0` over 10s. Total run time is about
+  2m40s.
+- Each virtual user connects once and reuses that connection, matching how
+  a real client behaves.
+- Fails the run if fewer than 99% of checks pass, or if `grpc_req_duration`
+  p95 goes over 500ms.
+
+### Clean up before running
+
+Old data changes the results, and stopped services keep stale numbers in
+memory. Before each run:
+
+```bash
+# 1. Stop Service A, the relay, and Service B (Ctrl+C each)
+
+# 2. Empty the outbox
+docker exec -it micro-services-postgres-1 psql -U anwar -d sumdb -c "TRUNCATE TABLE outbox;"
+
+# 3. Delete the Kafka topic in Kafka UI (localhost:8080 -> Topics -> number-added -> delete)
+#    It is recreated automatically on the next publish.
+
+# 4. Reset Service B's saved total
+rm service-b/sum_state.json
+
+# 5. Start Service A, the relay, and Service B again
+```
+
+Confirm the reset worked before running K6:
+
+```bash
+curl -s http://localhost:9100/metrics | grep add_requests_total
+# should print 0
+```
+
+### Run it
+
+```bash
+cd load-test
+k6 run grpc-test.js
+```
+
+Open the Grafana dashboard in another tab first, with the time range set to
+the last 15 minutes and auto-refresh on, so you can watch the latency and
+CPU panels move while the test runs.
+
 ## Environment variables
 
 | Service   | Variable            | Default           | Purpose                          |
@@ -311,6 +378,5 @@ anywhere real.
 
 ## Roadmap
 
-- Load tests with K6 (gRPC against Service A, HTTP against Service B)
 - Containerize Service A, the relay, and Service B so `docker compose up`
   starts everything

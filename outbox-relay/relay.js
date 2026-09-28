@@ -36,7 +36,7 @@ const pool = new pg.Pool({
 });
 
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS, 10) || 1000;
-const BATCH_SIZE = 100; // max number of rows to process in one poll cycle
+const BATCH_SIZE = parseInt(process.env.BATCH_SIZE, 10) || 100;
 
 // A simple flag so we don't start a second poll cycle while one is still
 // running (e.g. if a poll cycle takes longer than POLL_INTERVAL_MS due to
