@@ -1,0 +1,12 @@
+# Keep these out of every Docker build context (context: . for all services)
+
+**/node_modules
+**/venv
+**/__pycache__
+**/*.pyc
+**/generated
+.git
+.gitignore
+*.md
+service-b/sum_state.json
+service-b/sum_state.json.tmp

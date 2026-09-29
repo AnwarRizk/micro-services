@@ -46,6 +46,15 @@ services:
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
     ports:
       - '9094:9094' # for service-a / service-b running on your host machine
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          '/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   # ---------- Web UI for inspecting topics, messages, consumer groups ----------
   kafka-ui:
@@ -77,10 +86,63 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
 
+  # --------- Service A ---------
+  service-a:
+    build:
+      context: .
+      dockerfile: service-a/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      GRPC_PORT: '50051'
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: sumdb
+      POSTGRES_USER: anwar
+      POSTGRES_PASSWORD: '1234'
+    ports:
+      - '50051:50051'
+      - '9100:9100'
+
+  # --------- Outbox Relay ---------
+  outbox-relay:
+    build: ./outbox-relay
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: sumdb
+      POSTGRES_USER: anwar
+      POSTGRES_PASSWORD: '1234'
+      KAFKA_BROKER: kafka:9092
+      KAFKA_TOPIC: number-added
+    ports:
+      - '9101:9101'
+
+  # --------- Service B ---------
+  service-b:
+    build: ./service-b
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: kafka:9092
+      KAFKA_TOPIC: number-added
+      KAFKA_GROUP_ID: service-b-group
+      SUM_FILE_PATH: /data/sum_state.json
+    ports:
+      - '8000:8000'
+    volumes:
+      - sumdata:/data
+
 volumes:
   pgdata:
   grafana-data:
-
-# NOTE: service-a and service-b are not containerized yet — run them
-# directly on your host (npm start / uvicorn) for now. They'll be added
-# here once each has a Dockerfile.
+  sumdata:
