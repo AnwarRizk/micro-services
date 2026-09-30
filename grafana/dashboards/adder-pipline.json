@@ -4,18 +4,18 @@
   "metadata": {
     "name": "adbcz26",
     "namespace": "default",
-    "uid": "f5ed89cc-3734-4433-9f33-6e33342e3737",
-    "resourceVersion": "1790591854796004",
-    "generation": 9,
-    "creationTimestamp": "2026-09-27T13:16:40Z",
+    "uid": "9133f3c0-c44c-4f38-a57a-fb18832250db",
+    "resourceVersion": "1790723127317007",
+    "generation": 2,
+    "creationTimestamp": "2026-09-29T23:02:55Z",
     "labels": {
-      "grafana.app/deprecatedInternalID": "1017513256321024"
+      "grafana.app/deprecatedInternalID": "1889823631179776"
     },
     "annotations": {
-      "grafana.app/createdBy": "user:bfzirhyh9xtdsb",
+      "grafana.app/createdBy": "user:afzr7wtfm1khsa",
       "grafana.app/saved-from-ui": "Grafana v13.2.1 (56cd3e9288)",
-      "grafana.app/updatedBy": "user:bfzirhyh9xtdsb",
-      "grafana.app/updatedTimestamp": "2026-09-28T10:37:34Z"
+      "grafana.app/updatedBy": "user:afzr7wtfm1khsa",
+      "grafana.app/updatedTimestamp": "2026-09-29T23:05:27Z"
     }
   },
   "spec": {
@@ -62,7 +62,7 @@
                       "group": "prometheus",
                       "version": "v0",
                       "datasource": {
-                        "name": "efzirnqlpvj7kd"
+                        "name": "cfzr87wmycum8a"
                       },
                       "spec": {
                         "editorMode": "builder",
@@ -144,7 +144,7 @@
                       "group": "prometheus",
                       "version": "v0",
                       "datasource": {
-                        "name": "efzirnqlpvj7kd"
+                        "name": "cfzr87wmycum8a"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -165,7 +165,7 @@
                       "group": "prometheus",
                       "version": "v0",
                       "datasource": {
-                        "name": "efzirnqlpvj7kd"
+                        "name": "cfzr87wmycum8a"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -284,7 +284,7 @@
                       "group": "prometheus",
                       "version": "v0",
                       "datasource": {
-                        "name": "efzirnqlpvj7kd"
+                        "name": "cfzr87wmycum8a"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -305,7 +305,7 @@
                       "group": "prometheus",
                       "version": "v0",
                       "datasource": {
-                        "name": "efzirnqlpvj7kd"
+                        "name": "cfzr87wmycum8a"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -421,7 +421,7 @@
                       "group": "prometheus",
                       "version": "v0",
                       "datasource": {
-                        "name": "efzirnqlpvj7kd"
+                        "name": "cfzr87wmycum8a"
                       },
                       "spec": {
                         "editorMode": "builder",
@@ -519,7 +519,7 @@
                       "group": "prometheus",
                       "version": "v0",
                       "datasource": {
-                        "name": "efzirnqlpvj7kd"
+                        "name": "cfzr87wmycum8a"
                       },
                       "spec": {
                         "editorMode": "code",
@@ -647,7 +647,7 @@
             "spec": {
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-4"
+                "name": "panel-5"
               }
             }
           },
@@ -656,7 +656,7 @@
             "spec": {
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-5"
+                "name": "panel-4"
               }
             }
           },

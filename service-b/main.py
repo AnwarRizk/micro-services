@@ -52,6 +52,7 @@ async def consume_loop():
         bootstrap_servers=KAFKA_BROKER,
         group_id=KAFKA_GROUP_ID,
         auto_offset_reset="earliest",  # if this is a brand-new consumer group, start from the beginning of the topic
+        metadata_max_age_ms=5000,  # refresh topic metadata every 5s instead of the 5-minute default
     )
     await consumer.start()
     print(f"[kafka] consumer subscribed to '{KAFKA_TOPIC}' on {KAFKA_BROKER}")
