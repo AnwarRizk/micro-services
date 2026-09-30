@@ -11,11 +11,12 @@ export const options = {
       startRate: 5,
       timeUnit: '1s',
       preAllocatedVUs: 50,
-      maxVUs: 200,
+      maxVUs: 300,
       stages: [
-        { target: 10, duration: '30s' }, // warm up
-        { target: 25, duration: '1m' }, // around the predicted relay limit
-        { target: 50, duration: '1m' }, // push past it
+        { target: 20, duration: '30s' }, // warm up, well under old ceiling
+        { target: 50, duration: '1m' }, // the OLD ceiling — should now be flat, not climbing
+        { target: 100, duration: '1m' }, // the NEW predicted ceiling
+        { target: 150, duration: '1m' }, // push past the new ceiling on purpose
         { target: 0, duration: '10s' }, // ramp down
       ],
     },
