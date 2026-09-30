@@ -1,4 +1,4 @@
-# Microservices Project
+# Distributed Microservices System
 
 A small distributed system built as a learning project. Every component
 runs in Docker.
@@ -10,7 +10,7 @@ latency, CPU, and memory across the pipeline.
 
 ## Architecture
 
-<img width="700" alt="Architecture diagram" src="https://github.com/user-attachments/assets/bc0bd689-f11e-4dc1-ab76-e181e90187a5" />
+<img width="1954" height="1032" alt="Image" src="https://github.com/user-attachments/assets/c2dd32a4-af13-410d-bb45-231eff058d29" />
 
 ```
 Actor/User --gRPC--> Service A (Node.js) --INSERT--> PostgreSQL (outbox)
